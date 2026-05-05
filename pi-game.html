@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>π Memory</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<!-- Firebase SDK (cloud leaderboard) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root {
     --bg:#0a0a0f; --panel:#0f0f1a; --border:#1a1a2e;
@@ -401,6 +404,23 @@
   .lb-title{font-family:'Orbitron',monospace;font-size:13px;color:var(--accent);letter-spacing:3px;}
   .lb-back{background:none;border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:12px;padding:6px 12px;cursor:pointer;}
 
+  .lb-actions{display:flex;align-items:center;gap:8px;}
+
+  .lb-cloud{
+    font-family:'Orbitron',monospace;font-size:8px;letter-spacing:1px;
+    color:var(--dim);padding:4px 8px;border:1px solid var(--border);border-radius:4px;
+  }
+  .lb-cloud.on{color:var(--accent);border-color:rgba(0,255,136,0.3);}
+
+  .lb-refresh{
+    background:none;border:1px solid var(--border);color:var(--dim);
+    font-size:14px;padding:4px 8px;cursor:pointer;border-radius:4px;
+    transition:all 0.15s;
+  }
+  .lb-refresh:active{border-color:var(--accent);color:var(--accent);}
+  .lb-refresh.spinning{animation:spin 0.8s linear infinite;}
+  @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}};
+
   .lb-tabs{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
   .lb-tab{flex:1;padding:8px 0;background:transparent;border:none;font-family:'Orbitron',monospace;font-size:9px;letter-spacing:1px;cursor:pointer;color:var(--dim);transition:all 0.2s;}
   .lb-tab.on{background:rgba(0,255,136,0.1);color:var(--accent);}
@@ -420,6 +440,8 @@
   .lb-body::-webkit-scrollbar{display:none;}
 
   .lb-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);}
+  .lb-row.mine{background:rgba(0,255,136,0.05);border-left:2px solid var(--accent);}
+  .lb-row.mine.mem-entry{background:rgba(255,102,0,0.05);border-left-color:var(--hc);}
   .lb-rk{font-family:'Orbitron',monospace;font-size:12px;color:var(--dim);width:24px;text-align:center;flex-shrink:0;}
   .lb-rk.g{color:#ffd700;} .lb-rk.s{color:#c0c0c0;} .lb-rk.b{color:#cd7f32;}
   .lb-nm{flex:1;font-size:13px;}
@@ -427,7 +449,81 @@
   .lb-sc.mem{color:var(--hc);}
   .lb-tm{font-size:11px;color:var(--dim);text-align:right;flex-shrink:0;}
   .lb-empty{text-align:center;color:var(--dim);font-size:11px;padding:40px 0;letter-spacing:2px;}
+  .lb-loading{text-align:center;color:var(--dim);font-size:11px;padding:40px 0;letter-spacing:2px;animation:pulse 1s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
 
+  /* ===== ADMIN ===== */
+  .lb-admin-btn{
+    display:block;width:100%;padding:8px;margin-top:12px;
+    background:transparent;border:1px solid #1a1a2e;
+    color:#2a2a4a;font-family:'Orbitron',monospace;font-size:8px;
+    letter-spacing:2px;cursor:pointer;border-radius:4px;
+    transition:all 0.2s;
+  }
+  .lb-admin-btn:hover{border-color:var(--dim);color:var(--dim);}
+
+  .admin-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.92);
+    z-index:7000;display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-start;
+    padding:24px 20px;overflow-y:auto;
+  }
+  .admin-title{
+    font-family:'Orbitron',monospace;font-size:14px;color:var(--danger);
+    letter-spacing:4px;margin-bottom:20px;
+  }
+  .admin-section{
+    width:100%;max-width:360px;border:1px solid var(--border);
+    border-radius:8px;overflow:hidden;margin-bottom:16px;
+  }
+  .admin-section-title{
+    font-family:'Orbitron',monospace;font-size:9px;letter-spacing:3px;
+    color:var(--dim);padding:10px 14px;border-bottom:1px solid var(--border);
+    background:var(--panel);
+  }
+  .admin-row{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 14px;border-bottom:1px solid var(--border);
+  }
+  .admin-row:last-child{border-bottom:none;}
+  .admin-row-nm{flex:1;font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .admin-row-sc{font-family:'Orbitron',monospace;font-size:12px;color:var(--accent);flex-shrink:0;}
+  .admin-row-sc.mem{color:var(--hc);}
+  .admin-del{
+    background:transparent;border:1px solid var(--danger);color:var(--danger);
+    font-family:'Orbitron',monospace;font-size:9px;padding:4px 8px;
+    cursor:pointer;border-radius:4px;flex-shrink:0;
+  }
+  .admin-del:active{background:var(--danger);color:var(--bg);}
+  .admin-clear-btn{
+    width:100%;max-width:360px;padding:12px;background:transparent;
+    border:1px solid var(--danger);color:var(--danger);
+    font-family:'Orbitron',monospace;font-size:11px;letter-spacing:3px;
+    cursor:pointer;border-radius:8px;margin-bottom:10px;
+  }
+  .admin-clear-btn:active{background:var(--danger);color:var(--bg);}
+  .admin-close{
+    width:100%;max-width:360px;padding:12px;background:transparent;
+    border:1px solid var(--border);color:var(--dim);
+    font-family:'Orbitron',monospace;font-size:11px;letter-spacing:3px;
+    cursor:pointer;border-radius:8px;
+  }
+  .admin-pw-wrap{width:100%;max-width:360px;display:flex;gap:8px;margin-bottom:16px;}
+  .admin-pw-input{
+    flex:1;background:var(--bg);border:1px solid var(--border);
+    border-radius:8px;color:var(--text);font-family:'Share Tech Mono',monospace;
+    font-size:16px;padding:10px 14px;letter-spacing:3px;outline:none;
+  }
+  .admin-pw-input:focus{border-color:var(--danger);}
+  .admin-pw-btn{
+    background:var(--danger);border:none;border-radius:8px;
+    color:var(--bg);font-family:'Orbitron',monospace;font-size:11px;
+    font-weight:700;letter-spacing:2px;padding:0 16px;cursor:pointer;flex-shrink:0;
+  }
+  .admin-pw-err{
+    font-size:11px;color:var(--danger);letter-spacing:2px;margin-bottom:12px;
+    font-family:'Orbitron',monospace;
+  }
 </style>
 </head>
 <body>
@@ -532,7 +628,11 @@
     <div class="lb-header">
       <div class="lb-top">
         <div class="lb-title">LEADERBOARD</div>
-        <button class="lb-back" onclick="goHome()">← BACK</button>
+        <div class="lb-actions">
+          <span class="lb-cloud" id="cloudStatus">☁ LOCAL</span>
+          <button class="lb-refresh" id="lbRefreshBtn" onclick="refreshLb()" title="새로고침">↻</button>
+          <button class="lb-back" onclick="goHome()">← BACK</button>
+        </div>
       </div>
       <div class="lb-tabs">
         <button class="lb-tab on" id="tabTA" onclick="switchTab('ta')">⏱ TIME ATTACK</button>
@@ -544,13 +644,292 @@
         <button class="lb-subtab" id="sub100" onclick="switchSubtab(100)">100자리</button>
       </div>
     </div>
-    <div class="lb-body" id="lbBody"></div>
+    <div class="lb-body" id="lbBody">
+      <button class="lb-admin-btn" onclick="openAdmin()">⚙ ADMIN</button>
+    </div>
   </div>
 </div>
 
 <script>
 const PI = "14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196";
 
+// =====================================================
+// CLOUD LEADERBOARD SETUP
+// 1. https://console.firebase.google.com 에서 프로젝트 생성
+// 2. Firestore Database 활성화 (테스트 모드)
+// 3. 아래 null을 Firebase 설정 객체로 교체
+// =====================================================
+const FIREBASE_CONFIG = null;
+/*
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSy...",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project-id",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "000000000",
+  appId: "1:000000000:web:abc123"
+};
+*/
+
+// 관리자 비밀번호 (변경 가능)
+const ADMIN_PASSWORD = "pi3141592";
+
+let db = null;
+
+function initFirebase() {
+  if (!FIREBASE_CONFIG) return;
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    const el = document.getElementById('cloudStatus');
+    el.textContent = '☁ CLOUD';
+    el.classList.add('on');
+  } catch(e) { console.warn('Firebase init failed:', e); }
+}
+
+// =====================================================
+// LOCAL STORAGE (fallback / offline cache)
+// =====================================================
+function lbKey(tab, sub) { return tab === 'ta' ? `pi_ta_${sub}` : 'pi_mem'; }
+function getLbLocal(tab, sub) { try { return JSON.parse(localStorage.getItem(lbKey(tab,sub)) || '[]'); } catch(e) { return []; } }
+function saveLbLocal(tab, sub, lb) { localStorage.setItem(lbKey(tab,sub), JSON.stringify(lb)); }
+
+// =====================================================
+// SCORE SUBMISSION
+// =====================================================
+async function addScoreTA(tgt, name, ms) {
+  const entry = { name, ms, ts: Date.now() };
+  // local
+  const lb = getLbLocal('ta', tgt);
+  lb.push(entry);
+  lb.sort((a,b) => a.ms - b.ms);
+  saveLbLocal('ta', tgt, lb.slice(0,100));
+  // cloud
+  if (db) {
+    try { await db.collection(`lb_ta_${tgt}`).add(entry); } catch(e) { console.warn('Firestore write:', e); }
+  }
+}
+
+async function addScoreMem(name, digits, ms) {
+  const entry = { name, digits, ms, ts: Date.now() };
+  // local
+  const lb = getLbLocal('mem', null);
+  lb.push(entry);
+  lb.sort((a,b) => b.digits - a.digits || a.ms - b.ms);
+  saveLbLocal('mem', null, lb.slice(0,100));
+  // cloud
+  if (db) {
+    try { await db.collection('lb_mem').add(entry); } catch(e) { console.warn('Firestore write:', e); }
+  }
+}
+
+// =====================================================
+// LEADERBOARD RENDER
+// =====================================================
+let mode = 'ta';
+let target = 30;
+let lbTab = 'ta';
+let lbSubtab = 30;
+let G = {};
+let pending = null;
+let lastNickname = 'NICKNAME';
+
+function selectMode(m) {
+  mode = m;
+  document.getElementById('btnTA').className = m==='ta' ? 'mode-btn sel-ta' : 'mode-btn';
+  document.getElementById('btnMem').className = m==='mem' ? 'mode-btn sel-mem' : 'mode-btn';
+  const b = document.getElementById('startBtn');
+  b.className = m==='mem' ? 'btn-start mem' : 'btn-start';
+  b.textContent = m==='mem' ? '💀 START' : 'START';
+  const ts = document.getElementById('targetSel');
+  ts.className = m==='ta' ? 'target-selector visible' : 'target-selector';
+}
+
+function selectTarget(t) {
+  target = t;
+  [30,50,100].forEach(v => {
+    document.getElementById('t'+v).className = v===t ? 'target-btn sel' : 'target-btn';
+  });
+}
+
+function switchTab(t) {
+  lbTab = t;
+  document.getElementById('tabTA').className = t==='ta' ? 'lb-tab on' : 'lb-tab';
+  document.getElementById('tabMem').className = t==='mem' ? 'lb-tab memt on' : 'lb-tab memt';
+  document.getElementById('lbSubtabs').className = t==='ta' ? 'lb-subtabs' : 'lb-subtabs hidden';
+  renderLb();
+}
+
+function switchSubtab(v) {
+  lbSubtab = v;
+  [30,50,100].forEach(x => {
+    document.getElementById('sub'+x).className = x===v ? 'lb-subtab on' : 'lb-subtab';
+  });
+  renderLb();
+}
+
+async function renderLb() {
+  const isMem = lbTab === 'mem';
+  const el = document.getElementById('lbBody');
+  el.innerHTML = `<div class="lb-loading">LOADING...</div>`;
+
+  let lb = [];
+  if (db) {
+    try {
+      let snap;
+      if (isMem) {
+        // Firestore composite index needed: digits DESC, ms ASC
+        // Firebase console will show a link to create it on first run
+        snap = await db.collection('lb_mem')
+          .orderBy('digits','desc').orderBy('ms','asc').limit(30).get();
+      } else {
+        snap = await db.collection(`lb_ta_${lbSubtab}`)
+          .orderBy('ms','asc').limit(30).get();
+      }
+      lb = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch(e) {
+      console.warn('Firestore read failed, using local:', e);
+      lb = isMem ? getLbLocal('mem', null) : getLbLocal('ta', lbSubtab);
+    }
+  } else {
+    lb = isMem ? getLbLocal('mem', null) : getLbLocal('ta', lbSubtab);
+  }
+
+  if (!lb.length) {
+    el.innerHTML = `<div class="lb-empty">${isMem?'💀 ':''}NO RECORDS YET</div>
+                    <button class="lb-admin-btn" onclick="openAdmin()">⚙ ADMIN</button>`;
+    return;
+  }
+
+  const myName = lastNickname.toUpperCase();
+  el.innerHTML = lb.slice(0,30).map((e,i) => {
+    const rk = i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`;
+    const rc = i===0?'g':i===1?'s':i===2?'b':'';
+    const score = isMem ? e.digits : fmtT(e.ms);
+    const sub   = isMem ? fmtT(e.ms) : '';
+    const mine  = (e.name||'').toUpperCase() === myName;
+    const mineClass = mine ? (isMem ? ' mine mem-entry' : ' mine') : '';
+    const idAttr = e.id ? ` data-id="${e.id}"` : '';
+    return `<div class="lb-row${mineClass}"${idAttr}>
+      <div class="lb-rk ${rc}">${rk}</div>
+      <div class="lb-nm">${e.name||'ANON'}</div>
+      <div class="lb-sc ${isMem?'mem':''}">${score}</div>
+      ${sub ? `<div class="lb-tm">${sub}</div>` : ''}
+    </div>`;
+  }).join('') + `<button class="lb-admin-btn" onclick="openAdmin()">⚙ ADMIN</button>`;
+}
+
+async function refreshLb() {
+  const btn = document.getElementById('lbRefreshBtn');
+  btn.classList.add('spinning');
+  await renderLb();
+  btn.classList.remove('spinning');
+}
+
+function showView(id) { document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function goHome() { showView('startScreen'); }
+function showLb() { renderLb(); showView('lbScreen'); }
+
+// =====================================================
+// ADMIN PANEL
+// =====================================================
+let adminUnlocked = false;
+
+function openAdmin() {
+  const overlay = document.createElement('div');
+  overlay.className = 'admin-overlay';
+  overlay.id = 'adminOverlay';
+
+  if (!adminUnlocked) {
+    overlay.innerHTML = `
+      <div class="admin-title">⚙ ADMIN</div>
+      <div class="admin-pw-wrap">
+        <input class="admin-pw-input" id="adminPwInput" type="password" placeholder="PASSWORD" maxlength="20">
+        <button class="admin-pw-btn" onclick="checkAdminPw()">OK</button>
+      </div>
+      <div class="admin-pw-err" id="adminPwErr" style="display:none">WRONG PASSWORD</div>
+      <button class="admin-close" onclick="closeAdmin()">← CLOSE</button>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('adminPwInput').addEventListener('keydown', e => { if(e.key==='Enter') checkAdminPw(); });
+    document.getElementById('adminPwInput').focus();
+  } else {
+    document.body.appendChild(overlay);
+    buildAdminPanel(overlay);
+  }
+}
+
+function checkAdminPw() {
+  const pw = document.getElementById('adminPwInput').value;
+  if (pw === ADMIN_PASSWORD) {
+    adminUnlocked = true;
+    const overlay = document.getElementById('adminOverlay');
+    overlay.innerHTML = '';
+    buildAdminPanel(overlay);
+  } else {
+    document.getElementById('adminPwErr').style.display = 'block';
+    document.getElementById('adminPwInput').value = '';
+  }
+}
+
+function buildAdminPanel(overlay) {
+  const isMem = lbTab === 'mem';
+  const lb = isMem ? getLbLocal('mem', null) : getLbLocal('ta', lbSubtab);
+  const tabLabel = isMem ? 'MEMORY' : `TIME ATTACK · ${lbSubtab}자리`;
+
+  let rows = lb.slice(0,50).map((e,i) => {
+    const score = isMem ? `${e.digits}자리` : fmtT(e.ms);
+    return `<div class="admin-row">
+      <div class="lb-rk" style="flex-shrink:0">#${i+1}</div>
+      <div class="admin-row-nm">${e.name||'ANON'}</div>
+      <div class="admin-row-sc ${isMem?'mem':''}">${score}</div>
+      <button class="admin-del" onclick="adminDel(${i})">DEL</button>
+    </div>`;
+  }).join('');
+
+  overlay.innerHTML = `
+    <div class="admin-title">⚙ ADMIN</div>
+    <div class="admin-section" style="width:100%;max-width:360px">
+      <div class="admin-section-title">${tabLabel}</div>
+      ${rows || '<div style="padding:16px;font-size:11px;color:var(--dim)">NO RECORDS</div>'}
+    </div>
+    <button class="admin-clear-btn" onclick="adminClearAll()">🗑 CLEAR ALL (${tabLabel})</button>
+    <button class="admin-close" onclick="closeAdmin()">← CLOSE</button>
+  `;
+}
+
+function adminDel(idx) {
+  if (!confirm(`#${idx+1} 항목을 삭제할까요?`)) return;
+  const isMem = lbTab === 'mem';
+  const lb = isMem ? getLbLocal('mem', null) : getLbLocal('ta', lbSubtab);
+  lb.splice(idx, 1);
+  if (isMem) saveLbLocal('mem', null, lb);
+  else saveLbLocal('ta', lbSubtab, lb);
+  // Cloud delete: get id from rendered row (cloud entries have doc id)
+  const overlay = document.getElementById('adminOverlay');
+  buildAdminPanel(overlay);
+  renderLb();
+}
+
+function adminClearAll() {
+  const isMem = lbTab === 'mem';
+  const tabLabel = isMem ? 'MEMORY' : `TIME ATTACK · ${lbSubtab}자리`;
+  if (!confirm(`${tabLabel} 전체 기록을 삭제할까요?`)) return;
+  if (isMem) saveLbLocal('mem', null, []);
+  else saveLbLocal('ta', lbSubtab, []);
+  const overlay = document.getElementById('adminOverlay');
+  buildAdminPanel(overlay);
+  renderLb();
+}
+
+function closeAdmin() {
+  const overlay = document.getElementById('adminOverlay');
+  if (overlay) overlay.remove();
+}
+
+// =====================================================
+// AUDIO
+// =====================================================
 function lapAtRow(row) { return row === 0 ? 6 : 6 + row * 8; }
 function rowOfPos(pos) { return pos < 6 ? 0 : 1 + Math.floor((pos - 6) / 8); }
 function totalDisplayRows(pos) { return rowOfPos(pos) + 2; }
@@ -599,96 +978,9 @@ function playClear(){
   });}catch(e){}
 }
 
-let mode = 'ta';
-let target = 30;
-let lbTab = 'ta';
-let lbSubtab = 30;
-let G = {};
-let pending = null;
-let lastNickname = 'NICKNAME';
-
-function selectMode(m) {
-  mode = m;
-  document.getElementById('btnTA').className = m==='ta' ? 'mode-btn sel-ta' : 'mode-btn';
-  document.getElementById('btnMem').className = m==='mem' ? 'mode-btn sel-mem' : 'mode-btn';
-  const b = document.getElementById('startBtn');
-  b.className = m==='mem' ? 'btn-start mem' : 'btn-start';
-  b.textContent = m==='mem' ? '💀 START' : 'START';
-  const ts = document.getElementById('targetSel');
-  ts.className = m==='ta' ? 'target-selector visible' : 'target-selector';
-}
-
-function selectTarget(t) {
-  target = t;
-  [30,50,100].forEach(v => {
-    document.getElementById('t'+v).className = v===t ? 'target-btn sel' : 'target-btn';
-  });
-}
-
-function lbKey(tab, sub) { return tab === 'ta' ? `pi_ta_${sub}` : 'pi_mem'; }
-function getLb(tab, sub) { try { return JSON.parse(localStorage.getItem(lbKey(tab, sub)) || '[]'); } catch(e) { return []; } }
-function saveLb(tab, sub, lb) { localStorage.setItem(lbKey(tab, sub), JSON.stringify(lb)); }
-
-function addScoreTA(tgt, name, ms) {
-  const lb = getLb('ta', tgt);
-  lb.push({ name, ms });
-  lb.sort((a,b) => a.ms - b.ms);
-  saveLb('ta', tgt, lb.slice(0, 100));
-}
-
-function addScoreMem(name, digits, ms) {
-  const lb = getLb('mem', null);
-  lb.push({ name, digits, ms });
-  lb.sort((a,b) => b.digits - a.digits || a.ms - b.ms);
-  saveLb('mem', null, lb.slice(0, 100));
-}
-
-function switchTab(t) {
-  lbTab = t;
-  document.getElementById('tabTA').className = t==='ta' ? 'lb-tab on' : 'lb-tab';
-  document.getElementById('tabMem').className = t==='mem' ? 'lb-tab memt on' : 'lb-tab memt';
-  document.getElementById('lbSubtabs').className = t==='ta' ? 'lb-subtabs' : 'lb-subtabs hidden';
-  renderLb();
-}
-
-function switchSubtab(v) {
-  lbSubtab = v;
-  [30,50,100].forEach(x => {
-    document.getElementById('sub'+x).className = x===v ? 'lb-subtab on' : 'lb-subtab';
-  });
-  renderLb();
-}
-
-function renderLb() {
-  const isMem = lbTab === 'mem';
-  const lb = isMem ? getLb('mem', null) : getLb('ta', lbSubtab);
-  const el = document.getElementById('lbBody');
-  if (!lb.length) { el.innerHTML = `<div class="lb-empty">${isMem?'💀 ':''}NO RECORDS YET</div>`; return; }
-  el.innerHTML = lb.slice(0, 30).map((e,i) => {
-    const rk = i===0?'🥇':i===1?'🥈':i===2?'🥉':`#${i+1}`;
-    const rc = i===0?'g':i===1?'s':i===2?'b':'';
-    const score = isMem ? e.digits : fmtT(e.ms);
-    const sub = isMem ? fmtT(e.ms) : '';
-    return `<div class="lb-row">
-      <div class="lb-rk ${rc}">${rk}</div>
-      <div class="lb-nm">${e.name||'ANON'}</div>
-      <div class="lb-sc ${isMem?'mem':''}">${score}</div>
-      ${sub ? `<div class="lb-tm">${sub}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-function showView(id) { document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.getElementById(id).classList.add('active'); }
-function goHome() { showView('startScreen'); }
-function showLb() { renderLb(); showView('lbScreen'); }
-
-function fmtT(ms) {
-  if (ms==null||isNaN(ms)) return '--:--.-';
-  const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000),d=Math.floor((ms%1000)/100);
-  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${d}`;
-}
-function fmtLap(ms) { const s=Math.floor(ms/1000),d=Math.floor((ms%1000)/100); return `${s}.${d}s`; }
-
+// =====================================================
+// GAME LOGIC
+// =====================================================
 function renderRows() {
   const pos = G.pos;
   const isMem = G.mode === 'mem';
@@ -862,8 +1154,7 @@ function showResult() {
     html+=`<div class="stat-row"><span class="slbl">WORST LAP</span><span class="sval">${fmtLap(worst)}</span></div>`;
   }
   document.getElementById('resStats').innerHTML=html;
-  const isMem2 = G.mode==='mem';
-  const label = isMem2 ? 'RECORD YOUR NAME' : (G.cleared ? `🏆 ${G.target}자리 클리어!` : 'RECORD YOUR NAME');
+  const label = isMem ? 'RECORD YOUR NAME' : (G.cleared ? `🏆 ${G.target}자리 클리어!` : 'RECORD YOUR NAME');
   document.getElementById('resInputLabel').textContent = label;
   document.getElementById('nameInput').value = lastNickname;
   pending = { mode:G.mode, target:G.target, digits:G.pos, ms:G.elapsed, cleared:G.cleared };
@@ -888,7 +1179,19 @@ function submit(save) {
   showLb();
 }
 
-// Easter egg
+// =====================================================
+// UTILS
+// =====================================================
+function fmtT(ms) {
+  if (ms==null||isNaN(ms)) return '--:--.-';
+  const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000),d=Math.floor((ms%1000)/100);
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${d}`;
+}
+function fmtLap(ms) { const s=Math.floor(ms/1000),d=Math.floor((ms%1000)/100); return `${s}.${d}s`; }
+
+// =====================================================
+// EASTER EGG
+// =====================================================
 let eggCount = 0, eggTimer = null, eggActive = false;
 function easterEgg() {
   if (eggActive) return;
@@ -925,6 +1228,9 @@ function showCreditScroll() {
   setTimeout(() => { overlay.remove(); eggActive = false; }, 1200 + 3140);
 }
 
+// =====================================================
+// KEYBOARD
+// =====================================================
 document.addEventListener('keydown',function(e){
   const rs = document.getElementById('resultScreen');
   if(rs.classList.contains('active')){ if(e.key==='Enter') submit(true); return; }
@@ -934,6 +1240,11 @@ document.addEventListener('keydown',function(e){
 document.querySelectorAll('.key').forEach(function(k){
   k.addEventListener('touchstart',function(e){e.preventDefault();},{passive:false});
 });
+
+// =====================================================
+// INIT
+// =====================================================
+initFirebase();
 </script>
 </body>
 </html>
