@@ -310,7 +310,7 @@
   .res-body{
     flex:1;display:flex;flex-direction:column;
     align-items:center;justify-content:center;
-    padding:24px 24px 16px;gap:0;overflow-y:auto;
+    padding:12px 24px 8px;gap:0;overflow-y:auto;
   }
 
   .res-title{
@@ -320,7 +320,7 @@
   }
   .res-title.clear{color:var(--accent);text-shadow:var(--glow);}
 
-  .res-badge{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:3px;color:var(--dim);margin-bottom:20px;}
+  .res-badge{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:3px;color:var(--dim);margin-bottom:12px;}
   .res-badge.mem{color:var(--hc);}
   .res-badge.ta{color:var(--accent);}
 
@@ -330,9 +330,9 @@
   }
   .res-score.mem{color:var(--hc);text-shadow:0 0 20px rgba(255,102,0,0.5);}
 
-  .res-label{font-size:11px;color:var(--dim);letter-spacing:3px;margin-bottom:20px;}
+  .res-label{font-size:11px;color:var(--dim);letter-spacing:3px;margin-bottom:12px;}
 
-  .res-stats{width:100%;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px;}
+  .res-stats{width:100%;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px;}
   .stat-row{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);}
   .stat-row:last-child{border-bottom:none;}
   .slbl{font-size:11px;color:var(--dim);}
@@ -349,7 +349,7 @@
   /* Result footer - name input pinned to bottom */
   .res-footer{
     flex-shrink:0;
-    padding:14px 20px 24px;
+    padding:10px 20px 16px;
     border-top:1px solid var(--border);
     background:var(--panel);
   }
@@ -1160,7 +1160,10 @@ function showResult() {
   document.getElementById('resStats').innerHTML=html;
   const label = isMem ? 'RECORD YOUR NAME' : (G.cleared ? `🏆 ${G.target}자리 클리어!` : 'RECORD YOUR NAME');
   document.getElementById('resInputLabel').textContent = label;
-  document.getElementById('nameInput').value = lastNickname;
+  const ni = document.getElementById('nameInput');
+  ni.value = lastNickname;
+  ni.onfocus = function() { if(this.value === lastNickname) this.value = ''; };
+  ni.onblur  = function() { if(this.value.trim() === '') this.value = lastNickname; };
   pending = { mode:G.mode, target:G.target, digits:G.pos, ms:G.elapsed, cleared:G.cleared };
   showView('resultScreen');
 }
