@@ -778,12 +778,15 @@ async function renderLb() {
         // Firestore composite index needed: digits DESC, ms ASC
         // Firebase console will show a link to create it on first run
         snap = await db.collection('lb_mem')
-          .orderBy('digits','desc').orderBy('ms','asc').limit(30).get();
+          .orderBy('digits','desc').limit(100).get();
+        lb = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        lb.sort((a,b) => b.digits - a.digits || a.ms - b.ms);
+        lb = lb.slice(0, 30);
       } else {
         snap = await db.collection(`lb_ta_${lbSubtab}`)
           .orderBy('ms','asc').limit(30).get();
+        lb = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
-      lb = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     } catch(e) {
       console.warn('Firestore read failed, using local:', e);
       lb = isMem ? getLbLocal('mem', null) : getLbLocal('ta', lbSubtab);
