@@ -86,12 +86,8 @@
     animation:creditRise 0.6s ease-out forwards;
   }
 
-  .credit-line.blink{
-    animation:creditBlink 0.5s step-end infinite;
-  }
-
-  .credit-line.gone{
-    opacity:0;
+  .credit-overlay.fade-out{
+    animation:creditFadeOut 0.4s ease-out forwards;
   }
 
   @keyframes creditRise{
@@ -99,9 +95,9 @@
     100%{ opacity:1; transform:translateY(0); }
   }
 
-  @keyframes creditBlink{
-    0%,100%{ opacity:1; }
-    50%    { opacity:0; }
+  @keyframes creditFadeOut{
+    0%  { opacity:1; }
+    100%{ opacity:0; }
   }
 
   .pi-rings{position:absolute;inset:-20px;pointer-events:none;}
@@ -403,6 +399,13 @@
   .lb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
   .lb-title{font-family:'Orbitron',monospace;font-size:13px;color:var(--accent);letter-spacing:3px;}
   .lb-back{background:none;border:1px solid var(--border);color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:12px;padding:6px 12px;cursor:pointer;}
+  .lb-home{
+    background:var(--accent);border:none;color:var(--bg);
+    font-family:'Orbitron',monospace;font-size:10px;font-weight:700;
+    letter-spacing:2px;padding:6px 14px;cursor:pointer;border-radius:3px;
+    box-shadow:var(--glow);
+  }
+  .lb-home:active{opacity:0.7;}
 
   .lb-actions{display:flex;align-items:center;gap:8px;}
 
@@ -631,7 +634,7 @@
         <div class="lb-actions">
           <span class="lb-cloud" id="cloudStatus">☁ LOCAL</span>
           <button class="lb-refresh" id="lbRefreshBtn" onclick="refreshLb()" title="새로고침">↻</button>
-          <button class="lb-back" onclick="goHome()">← BACK</button>
+          <button class="lb-home" onclick="goHome()">🏠 HOME</button>
         </div>
       </div>
       <div class="lb-tabs">
@@ -1028,6 +1031,7 @@ function buildCell(row, col, pos, isMem, tgtPos) {
 }
 
 function startGame() {
+  dismissCredit();
   if (G.interval) clearInterval(G.interval);
   const isMem = mode === 'mem';
   G = { running:true, started:false, pos:0, lives:3, timerStart:0, elapsed:0,
@@ -1209,23 +1213,29 @@ function easterEgg() {
   }
 }
 
+let creditOverlay = null;
+
+function dismissCredit() {
+  if (!creditOverlay) return;
+  creditOverlay.classList.add('fade-out');
+  setTimeout(() => { creditOverlay && creditOverlay.remove(); creditOverlay = null; eggActive = false; }, 400);
+}
+
 function showCreditScroll() {
   const lines = ['개발자', '최건우', '최광이'];
-  const overlay = document.createElement('div');
-  overlay.className = 'credit-overlay';
+  creditOverlay = document.createElement('div');
+  creditOverlay.className = 'credit-overlay';
   const els = lines.map(txt => {
     const el = document.createElement('div');
     el.className = 'credit-line';
     el.textContent = txt;
-    overlay.appendChild(el);
+    creditOverlay.appendChild(el);
     return el;
   });
-  document.body.appendChild(overlay);
-  els.forEach((el, i) => { setTimeout(() => { el.classList.add('rise'); }, i * 300); });
-  setTimeout(() => {
-    els.forEach(el => { el.classList.remove('rise'); el.style.opacity = '1'; el.classList.add('blink'); });
-  }, 1200);
-  setTimeout(() => { overlay.remove(); eggActive = false; }, 1200 + 3140);
+  document.body.appendChild(creditOverlay);
+  // 순서대로 rise, 총 2초 후 fade out
+  els.forEach((el, i) => { setTimeout(() => { el.classList.add('rise'); }, i * 200); });
+  setTimeout(() => { dismissCredit(); }, 2000);
 }
 
 // =====================================================
